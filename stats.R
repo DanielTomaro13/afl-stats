@@ -78,46 +78,128 @@ train_data <- player_model_data %>% filter(Season < 2024)
 test_data  <- player_model_data %>% filter(Season == 2024)
 #####################################################
 # Linear Model
-model_lm <- lm(Marks ~ ., data = train_data %>% 
-                 select(Marks, starts_with("avg_"), starts_with("roll3_")))
-summary(model_lm)
+model_disposals <- lm(Disposals ~ ., data = train_data %>% select(Disposals, starts_with("avg_"), starts_with("roll3_")))
+model_goals     <- lm(Goals ~ ., data = train_data %>% select(Goals, starts_with("avg_"), starts_with("roll3_")))
+model_marks     <- lm(Marks ~ ., data = train_data %>% select(Marks, starts_with("avg_"), starts_with("roll3_")))
+model_tackles   <- lm(Tackles ~ ., data = train_data %>% select(Tackles, starts_with("avg_"), starts_with("roll3_")))
+model_kicks     <- lm(Kicks ~ ., data = train_data %>% select(Kicks, starts_with("avg_"), starts_with("roll3_")))
+model_clear     <- lm(Clearances ~ ., data = train_data %>% select(Clearances, starts_with("avg_"), starts_with("roll3_")))
+
+summary(model_disposals)
+summary(model_goals)
+summary(model_marks)
+summary(model_tackles)
+summary(model_kicks)
+summary(model_clear)
 #####################################################
 library(xgboost)
 
-x_train <- train_data %>% select(starts_with("avg_"), starts_with("roll3_")) %>% as.matrix()
-y_train <- train_data$Marks
+train_xgb_model <- function(target_var) {
+  y_train <- train_data[[target_var]]
+  y_test  <- test_data[[target_var]]
+  
+  x_train <- train_data %>% select(starts_with("avg_"), starts_with("roll3_")) %>% as.matrix()
+  x_test  <- test_data %>% select(starts_with("avg_"), starts_with("roll3_")) %>% as.matrix()
+  
+  dtrain <- xgb.DMatrix(data = x_train, label = y_train)
+  dtest  <- xgb.DMatrix(data = x_test, label = y_test)
+  
+  model <- xgboost(
+    data = dtrain,
+    nrounds = 100,
+    objective = "reg:squarederror",
+    verbose = 0
+  )
+  
+  preds <- predict(model, newdata = x_test)
+  
+  list(model = model, predictions = preds)
+}
 
-x_test <- test_data %>% select(starts_with("avg_"), starts_with("roll3_")) %>% as.matrix()
-y_test <- test_data$Marks
+# Target stats to model
+target_stats <- c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")
 
-dtrain <- xgb.DMatrix(data = x_train, label = y_train)
-dtest <- xgb.DMatrix(data = x_test, label = y_test)
-
-model_xgb <- xgboost(
-  data = dtrain,
-  nrounds = 100,
-  objective = "reg:squarederror",
-  verbose = 0
-)
-
-test_data$Predicted_Marks <- predict(model_xgb, newdata = x_test)
+# Store models and predictions
+xgb_models <- list()
+for (stat in target_stats) {
+  result <- train_xgb_model(stat)
+  xgb_models[[stat]] <- result$model
+  test_data[[paste0("Predicted_", stat)]] <- result$predictions
+}
 #####################################################
 library(Metrics)
 
-rmse <- rmse(test_data$Marks, test_data$Predicted_Marks)
-mae <- mae(test_data$Marks, test_data$Predicted_Marks)
-
-cat("RMSE:", rmse, "\nMAE:", mae)
+for (stat in target_stats) {
+  actual <- test_data[[stat]]
+  predicted <- test_data[[paste0("Predicted_", stat)]]
+  
+  rmse_val <- rmse(actual, predicted)
+  mae_val <- mae(actual, predicted)
+  
+  cat(stat, "- RMSE:", round(rmse_val, 2), "| MAE:", round(mae_val, 2), "\n")
+}
 #####################################################
 # Predictions
-future_lagged <- player_model_data %>% filter(Season == 2025, Round == 6)
+future_lagged <- player_model_data %>%
+  filter(Season == 2025, Round == 6)
 
-future_lagged$Predicted_Marks <- predict(model_xgb, newdata = future_lagged %>% select(starts_with("avg_"), starts_with("roll3_")) %>% as.matrix())
+future_matrix <- future_lagged %>%
+  select(starts_with("avg_"), starts_with("roll3_")) %>%
+  as.matrix()
 
-future_lagged_nm_carl <- future_lagged %>% filter(Team == 'North Melbourne' | Team == 'Carlton') %>% 
+for (stat in c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")) {
+  model <- xgb_models[[stat]]
+  pred <- predict(model, newdata = future_matrix)
+  future_lagged[[paste0("Predicted_", stat)]] <- pred
+}
+
+future_lagged_team <- future_lagged %>%
+  filter(Team %in% c("Geelong", "Hawthorn")) %>%
   select(
-    Team, Player, Predicted_Marks
+    Team, Player,
+    starts_with("Predicted_")
   )
+
+View(future_lagged_team)
+#####################################################
+# Comparision to a completed round
+round_data <- player_model_data %>%
+  filter(Season == 2025, Round == 5)
+
+round_matrix <- round_data %>%
+  select(starts_with("avg_"), starts_with("roll3_")) %>%
+  as.matrix()
+
+for (stat in c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")) {
+  model <- xgb_models[[stat]]
+  pred <- predict(model, newdata = round_matrix)
+  round_data[[paste0("Predicted_", stat)]] <- round(pred, 0)
+}
+
+round_comparison <- round_data %>%
+  select(
+    Team, Player,
+    Disposals, Predicted_Disposals,
+    Goals, Predicted_Goals,
+    Marks, Predicted_Marks,
+    Tackles, Predicted_Tackles,
+    Kicks, Predicted_Kicks,
+    Clearances, Predicted_Clearances
+  )
+
+target_stats <- c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")
+
+for (stat in target_stats) {
+  actual <- round_data[[stat]]
+  predicted <- round_data[[paste0("Predicted_", stat)]]
+  
+  mae_val <- mae(actual, predicted)
+  rmse_val <- rmse(actual, predicted)
+
+  cat(paste0(stat, ":\n"))
+  cat(sprintf("  MAE  = %.2f\n", mae_val))
+  cat(sprintf("  RMSE = %.2f\n", rmse_val))
+}
 #####################################################
 # Scrape TAB prices
 library(rvest)
