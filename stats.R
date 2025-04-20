@@ -84,10 +84,10 @@ summary(model_lm)
 #####################################################
 library(xgboost)
 
-x_train <- train_data %>% select(starts_with("avg_")) %>% as.matrix()
+x_train <- train_data %>% select(starts_with("avg_"), starts_with("roll3_")) %>% as.matrix()
 y_train <- train_data$Marks
 
-x_test <- test_data %>% select(starts_with("avg_")) %>% as.matrix()
+x_test <- test_data %>% select(starts_with("avg_"), starts_with("roll3_")) %>% as.matrix()
 y_test <- test_data$Marks
 
 dtrain <- xgb.DMatrix(data = x_train, label = y_train)
@@ -110,11 +110,11 @@ mae <- mae(test_data$Marks, test_data$Predicted_Marks)
 cat("RMSE:", rmse, "\nMAE:", mae)
 #####################################################
 # Predictions
-future_lagged <- player_lagged %>% filter(Season == 2025, Round == 6)
+future_lagged <- player_model_data %>% filter(Season == 2025, Round == 6)
 
-future_lagged$Predicted_Marks <- predict(model_xgb, newdata = future_lagged %>% select(starts_with("avg_")) %>% as.matrix())
+future_lagged$Predicted_Marks <- predict(model_xgb, newdata = future_lagged %>% select(starts_with("avg_"), starts_with("roll3_")) %>% as.matrix())
 
-future_lagged_nm_carl <- future_lagged %>% filter(Team == 'Brisbane Lions' | Team == 'Collingwood') %>% 
+future_lagged_nm_carl <- future_lagged %>% filter(Team == 'North Melbourne' | Team == 'Carlton') %>% 
   select(
     Team, Player, Predicted_Marks
   )
