@@ -201,51 +201,8 @@ for (stat in target_stats) {
   cat(sprintf("  RMSE = %.2f\n", rmse_val))
 }
 #####################################################
-# Scrape TAB prices
-library(rvest)
-library(httr)
-library(dplyr)
-
-url <- "https://www.tab.com.au/sports/betting/AFL%20Football/competitions/AFL/matches/North%20Melbourne%20v%20Carlton"
-
-headers <- c(
-  'User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
-)
-
-response <- GET(url, add_headers(.headers = headers))
-
-page <- content(response, "text") %>% read_html()
-
-players <- page %>%
-  html_nodes("td._e4e14m span._1eek9ib") %>%
-  html_text()
-
-odds_matrix <- page %>%
-  html_nodes("td._18h3vh3 span._njbycu") %>%
-  html_text()
-
-n_cols <- 5
-
-odds_df <- matrix(odds_matrix, ncol = n_cols, byrow = TRUE) %>%
-  as.data.frame()
-
-colnames(odds_df) <- c("2+ Marks", "4+ Marks", "6+ Marks", "8+ Marks", "10+ Marks")
-
-tab_prices <- cbind(Player = players, odds_df)
-tab_prices
+# Scrape TAB prices - how can i get in for?
 #####################################################
-# Getting In For
-# Odds for Player X
-odds <- c(`2+` = 1.03, `4+` = 1.60, `6+` = 3.40, `8+` = 11.00, `10+` = 41.00)
+# We need to be able to scrape prices for 1+, 2+ ... as much as we can to calculate in for to compare
 
-p_cum <- 1 / odds
 
-p_exact <- c(
-  `2` = p_cum["2+"],
-  `4` = p_cum["4+"] - p_cum["6+"],
-  `6` = p_cum["6+"] - p_cum["8+"],
-  `8` = p_cum["8+"] - p_cum["10+"],
-  `10+` = p_cum["10+"]
-)
-expected_marks <- sum(as.numeric(names(p_exact)) * p_exact)
-#####################################################
