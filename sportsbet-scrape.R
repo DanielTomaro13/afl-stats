@@ -3,77 +3,73 @@ library(httr)
 library(dplyr)
 library(stringr)
 
+# Set the URL and headers
 url <- "https://www.sportsbet.com.au/betting/australian-rules/afl/geelong-cats-v-hawthorn-9107388"
+headers <- c('User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36')
 
-headers <- c(
-  'User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-  'Accept-Language' = 'en-US,en;q=0.9'
-)
-
+# Get the page content
 page <- GET(url, add_headers(headers)) %>%
   content("text") %>%
   read_html()
 
-all_text <- page %>% html_nodes("span") %>% html_text()
+# Get all span text elements
+all_spans <- page %>% html_nodes("span") %>% html_text()
 
+# Create empty data frame
 player_odds_df <- data.frame(
   Player = character(),
   Odds = numeric(),
   Market = character(),
-  Market_Subtype = character(),
+  Threshold = numeric(),
+  Market_Type = character(),
   stringsAsFactors = FALSE
 )
 
-top_market <- NA
-sub_market <- NA
+# Track the current market
+current_market <- NA
 
-i <- 1
-while (i <= length(all_text)) {
-  text <- all_text[i]
+# Loop through all spans
+for (i in 1:length(all_spans)) {
+  text <- all_spans[i]
   
-  # Detect top-level market
-  if (grepl("Disposal Markets", text, ignore.case = TRUE)) {
-    top_market <- "Disposal"
-  } else if (grepl("Goal Scorer", text, ignore.case = TRUE)) {
-    top_market <- "Goal"
+  # Identify market headers
+  if (text %in% c("To Score 1 or More Goals", "To Score 2 or More Goals", "To Score 3 or More Goals", 
+                  "To Get 15 or More Disposals", "To Get 20 or More Disposals", "To Get 25 or More Disposals")) {
+    current_market <- text
+    next
   }
   
-  # Detect sub-market
-  if (grepl("To Get \\d+", text, ignore.case = TRUE)) {
-    number <- str_extract(text, "\\d+")
-    sub_market <- paste0(number, "+")
-  } else if (grepl("To Score \\d+", text, ignore.case = TRUE)) {
-    number <- str_extract(text, "\\d+")
-    sub_market <- paste0(number, "+")
-  }
-  
-  # Detect player name
-  if (grepl("^[A-Z][a-z]+\\s[A-Z][a-z]+$", text)) {
-    player <- text
-    j <- i + 1
+  if (!is.na(current_market) &&
+      grepl("^[A-Za-z' ]+$", text) && 
+      i+1 <= length(all_spans) && 
+      grepl("^Last 5:", all_spans[i+1])) {
     
-    while (j <= length(all_text) && grepl("^\\d+\\.\\d{2}$", all_text[j])) {
-      odds <- as.numeric(all_text[j])
-      
-      player_odds_df <- rbind(player_odds_df, data.frame(
-        Player = player,
-        Odds = odds,
-        Market = top_market,
-        Market_Subtype = sub_market,
-        stringsAsFactors = FALSE
-      ))
-      
-      j <- j + 1
+    player_name <- text
+    
+    for (j in (i+1):min(i+20, length(all_spans))) {
+      if (grepl("^[0-9]+\\.[0-9]+$", all_spans[j])) {
+        odds <- as.numeric(all_spans[j])
+        threshold <- as.numeric(gsub("\\D", "", current_market))
+        market_type <- ifelse(grepl("Disposals", current_market), "Disposals", "Goals")
+        
+        player_odds_df <- rbind(player_odds_df,
+                                data.frame(
+                                  Player = player_name,
+                                  Odds = odds,
+                                  Market = current_market,
+                                  Threshold = threshold,
+                                  Market_Type = market_type,
+                                  stringsAsFactors = FALSE))
+        break
+      }
     }
-    
-    i <- j - 1
   }
-  
-  i <- i + 1
 }
 
-# Clean + sort
+# Clean and arrange final output (no In_For or Probability)
 player_odds_df <- player_odds_df %>%
-  arrange(Market, Market_Subtype, Player)
+  distinct() %>%
+  arrange(Market_Type, Market, Player)
 
+# View result
 View(player_odds_df)

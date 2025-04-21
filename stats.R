@@ -201,8 +201,115 @@ for (stat in target_stats) {
   cat(sprintf("  RMSE = %.2f\n", rmse_val))
 }
 #####################################################
-# Scrape TAB prices - how can i get in for?
+# Scraping Bookies
+library(rvest)
+library(httr)
+library(dplyr)
+library(stringr)
+
+url <- "https://www.sportsbet.com.au/betting/australian-rules/afl/geelong-cats-v-hawthorn-9107388"
+headers <- c('User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36')
+
+page <- GET(url, add_headers(headers)) %>%
+  content("text") %>%
+  read_html()
+
+all_spans <- page %>% html_nodes("span") %>% html_text()
+print(all_spans)
+
+player_odds_df <- data.frame(
+  Player = character(),
+  Odds = numeric(),
+  Market = character(),
+  Threshold = numeric(),
+  Market_Type = character(),
+  stringsAsFactors = FALSE
+)
+
+current_market <- NA
+
+for (i in 1:length(all_spans)) {
+  text <- all_spans[i]
+  
+  if (text %in% c("To Score 1 or More Goals", "To Score 2 or More Goals", "To Score 3 or More Goals", 
+                  "To Get 15 or More Disposals", "To Get 20 or More Disposals", "To Get 25 or More Disposals")) {
+    current_market <- text
+    next
+  }
+  
+  if (!is.na(current_market) &&
+      grepl("^[A-Za-z' ]+$", text) && 
+      i+1 <= length(all_spans) && 
+      grepl("^Last 5:", all_spans[i+1])) {
+    
+    player_name <- text
+    
+    for (j in (i+1):min(i+20, length(all_spans))) {
+      if (grepl("^[0-9]+\\.[0-9]+$", all_spans[j])) {
+        odds <- as.numeric(all_spans[j])
+        threshold <- as.numeric(gsub("\\D", "", current_market))
+        market_type <- ifelse(grepl("Disposals", current_market), "Disposals", "Goals")
+        
+        player_odds_df <- rbind(player_odds_df,
+                                data.frame(
+                                  Player = player_name,
+                                  Odds = odds,
+                                  Market = current_market,
+                                  Threshold = threshold,
+                                  Market_Type = market_type,
+                                  stringsAsFactors = FALSE))
+        break
+      }
+    }
+  }
+}
+
+player_odds_df <- player_odds_df %>%
+  distinct() %>%
+  arrange(Market_Type, Market, Player)
+
+player_odds_df <- player_odds_df %>%
+  mutate(Prob = 1 / Odds)
+
+expected_goals <- player_odds_df %>%
+  filter(Market_Type == "Goals") %>%
+  arrange(Player, Threshold) %>%
+  group_by(Player) %>%
+  mutate(
+    Next_Prob = lead(Prob, default = 0),
+    Prob_Exact = Prob - Next_Prob,
+    Mid_Value = ifelse(is.na(lead(Threshold)), Threshold + 1, (Threshold + lead(Threshold)) / 2)
+  ) %>%
+  summarise(In_For = round(sum(Prob_Exact * Mid_Value), 2), .groups = "drop")
+
+expected_disposals <- player_odds_df %>%
+  filter(Market_Type == "Disposals") %>%
+  arrange(Player, Threshold) %>%
+  group_by(Player) %>%
+  mutate(
+    Next_Prob = lead(Prob, default = 0),
+    Prob_Exact = Prob - Next_Prob,
+    Mid_Value = ifelse(is.na(lead(Threshold)), Threshold + 3, (Threshold + lead(Threshold)) / 2)
+  ) %>%
+  summarise(In_For_Disposals = round(sum(Prob_Exact * Mid_Value), 2), .groups = "drop")
 #####################################################
-# We need to be able to scrape prices for 1+, 2+ ... as much as we can to calculate in for to compare
+# Comparision
+model_infor <- future_lagged_team %>%
+  select(Player, Team, Predicted_Disposals, Predicted_Goals)
 
+bookie_infor <- player_odds_df %>%
+  filter(Player %in% model_infor$Player) %>%
+  filter(Market_Type %in% c("Disposals", "Goals")) %>%
+  distinct(Player, Market_Type, In_For) %>%
+  pivot_wider(names_from = Market_Type, values_from = In_For, names_prefix = "Bookie_")
 
+compare_infor <- model_infor %>%
+  left_join(bookie_infor, by = "Player") %>%
+  select(Player, Team, 
+         Pred_Disposals = Predicted_Disposals,
+         Bookie_Disposals = Bookie_Disposals,
+         Pred_Goals = Predicted_Goals,
+         Bookie_Goals = Bookie_Goals)
+
+View(compare_infor)
+#####################################################
