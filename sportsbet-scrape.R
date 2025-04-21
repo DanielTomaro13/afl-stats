@@ -1,6 +1,7 @@
 library(rvest)
 library(httr)
 library(dplyr)
+library(stringr)
 
 url <- "https://www.sportsbet.com.au/betting/australian-rules/afl/geelong-cats-v-hawthorn-9107388"
 
@@ -15,40 +16,64 @@ page <- GET(url, add_headers(headers)) %>%
 
 all_text <- page %>% html_nodes("span") %>% html_text()
 
-disposal_markers <- which(grepl("Disposal Markets|To Get 20|To Get 25|First Disposal", all_text))
-goal_markers <- which(grepl("Goal Scorer|To Score 2|To Score 3|1st Goal Scorer", all_text))
-
-players_and_odds <- all_text[grepl("^[A-Z][a-z]+\\s[A-Z][a-z]+$", all_text) | grepl("^\\d+\\.\\d{2}$", all_text)]
-
-player_indices <- which(grepl("^[A-Z][a-z]+\\s[A-Z][a-z]+$", players_and_odds))
-
 player_odds_df <- data.frame(
   Player = character(),
   Odds = numeric(),
   Market = character(),
+  Market_Subtype = character(),
   stringsAsFactors = FALSE
 )
 
-disposal_start <- which(players_and_odds == "Bailey Smith")[1]
-goal_start <- which(players_and_odds == "Jeremy Cameron")[1]
+top_market <- NA
+sub_market <- NA
 
-for (i in player_indices) {
-  name <- players_and_odds[i]
+i <- 1
+while (i <= length(all_text)) {
+  text <- all_text[i]
   
-  odds_candidate <- players_and_odds[(i+1):(i+3)]
-  odds_vals <- odds_candidate[grepl("^\\d+\\.\\d{2}$", odds_candidate)]
-  
-  if (length(odds_vals) >= 1) {
-    market_type <- ifelse(i >= disposal_start, "Disposal", "Goal")
-    
-    player_odds_df <- rbind(player_odds_df, data.frame(
-      Player = name,
-      Odds = as.numeric(odds_vals[1]),
-      Market = market_type,
-      stringsAsFactors = FALSE
-    ))
+  # Detect top-level market
+  if (grepl("Disposal Markets", text, ignore.case = TRUE)) {
+    top_market <- "Disposal"
+  } else if (grepl("Goal Scorer", text, ignore.case = TRUE)) {
+    top_market <- "Goal"
   }
+  
+  # Detect sub-market
+  if (grepl("To Get \\d+", text, ignore.case = TRUE)) {
+    number <- str_extract(text, "\\d+")
+    sub_market <- paste0(number, "+")
+  } else if (grepl("To Score \\d+", text, ignore.case = TRUE)) {
+    number <- str_extract(text, "\\d+")
+    sub_market <- paste0(number, "+")
+  }
+  
+  # Detect player name
+  if (grepl("^[A-Z][a-z]+\\s[A-Z][a-z]+$", text)) {
+    player <- text
+    j <- i + 1
+    
+    while (j <= length(all_text) && grepl("^\\d+\\.\\d{2}$", all_text[j])) {
+      odds <- as.numeric(all_text[j])
+      
+      player_odds_df <- rbind(player_odds_df, data.frame(
+        Player = player,
+        Odds = odds,
+        Market = top_market,
+        Market_Subtype = sub_market,
+        stringsAsFactors = FALSE
+      ))
+      
+      j <- j + 1
+    }
+    
+    i <- j - 1
+  }
+  
+  i <- i + 1
 }
 
+# Clean + sort
 player_odds_df <- player_odds_df %>%
-  arrange(Market, Player)
+  arrange(Market, Market_Subtype, Player)
+
+View(player_odds_df)
