@@ -73,6 +73,16 @@ colSums(is.na(player_rolling_3))
 player_model_data <- player_model_data %>%
   inner_join(player_rolling_3, by = c("Date", "Season", "Round", "Team", "Player", "ID"))
 #####################################################
+# Player Position
+library(purrr)
+seasons <- 2003:2025
+player_details_all <- map_dfr(seasons, ~{
+  fetch_player_details(season = .x, source = "footywire")
+})
+
+position <- player_details_all %>% select(first_name, surname, Position_1, Position_2) %>% 
+  mutate(is_defender = NA, is_midfielder = NA, is_forward = NA)
+#####################################################
 # Modelling
 train_data <- player_model_data %>% filter(Season < 2024)
 test_data  <- player_model_data %>% filter(Season == 2024)
@@ -91,6 +101,7 @@ summary(model_marks)
 summary(model_tackles)
 summary(model_kicks)
 summary(model_clear)
+# Go through models and drop redunant features such as disposals or non significant features, check out H20 package
 #####################################################
 library(xgboost)
 
@@ -141,7 +152,7 @@ for (stat in target_stats) {
 #####################################################
 # Predictions
 future_lagged <- player_model_data %>%
-  filter(Season == 2025, Round == 6)
+  filter(Season == 2025, Round == 7)
 
 future_matrix <- future_lagged %>%
   select(starts_with("avg_"), starts_with("roll3_")) %>%
@@ -154,7 +165,7 @@ for (stat in c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances"))
 }
 
 future_lagged_team <- future_lagged %>%
-  filter(Team %in% c("Geelong", "Hawthorn")) %>%
+  filter(Team %in% c("Collingwood", "Essendon")) %>%
   select(
     Team, Player,
     starts_with("Predicted_")
@@ -164,7 +175,7 @@ View(future_lagged_team)
 #####################################################
 # Comparision to a completed round
 round_data <- player_model_data %>%
-  filter(Season == 2025, Round == 5)
+  filter(Season == 2025, Round == 6)
 
 round_matrix <- round_data %>%
   select(starts_with("avg_"), starts_with("roll3_")) %>%
