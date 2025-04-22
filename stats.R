@@ -98,14 +98,67 @@ player_model_data <- player_model_data %>%
   mutate(across(c(is_defender, is_midfielder, is_forward), ~replace_na(., 0)))
 #####################################################
 # Add some sort o feature for incredibly bad teams e.g. is_bottom_four
-# is_debut season
+#####################################################
+# is_debut season - player details has draft year
+#####################################################
 # is_over_100_games _200 _300 etc
+#####################################################
 # is_brownlow_winner
+#####################################################
 # is_bnf_winner
+#####################################################
 # is_stat_beast - does this player average x+ in a certain stat
+#####################################################
 # is_wet_weather
-# is_inside_mid , key_forward - there is a source for player details or results with this information
+weather <- fetch_results_afl()
+weather <- weather %>% select(match.date, round.roundNumber, match.homeTeam.name, match.awayTeam.name,
+                              weather.description, weather.tempInCelsius, weather.weatherType)
+#####################################################
+# is_key_forward or is_key_back or midfielder_forward 
+library(purrr)
+seasons <- 2003:2025
+player_details_specific <- map_dfr(seasons, ~{
+  fetch_player_details(season = .x, source = "AFL")
+})
+
+detailed_position <- player_details_specific %>%
+  select(firstName, surname, position)
+#####################################################
 # premiership_coach
+premiership_coaches <- c(
+  "Beveridge, Luke",
+  "Blight, Malcolm",
+  "Clarkson, Alastair",
+  "Goodwin, Simon",
+  "Hardwick, Damien",
+  "Jeans, Allan",
+  "Longmire, John",
+  "Malthouse, Michael",
+  "Malthouse, Mick",
+  "Matthews, Leigh",
+  "McRae, Craig",
+  "Pagan, Denis",
+  "Parkin, David",
+  "Roos, Paul",
+  "Scott, Chris",
+  "Sheedy, Kevin",
+  "Thompson, Mark",
+  "Walls, Robert",
+  "Williams, Mark"
+)
+coach <- fetch_player_stats_afltables(2003:2025)
+team_coach <- coach %>% select(Season, Round, Date, Playing.for, Coach) %>% 
+  rename(Team = Playing.for)
+
+prem_coach <- team_coach %>%
+  select(Date, Season, Round, Team, Coach) %>%
+  distinct() %>%  # So we don't duplicate teams
+  mutate(is_premiership_coach = ifelse(Coach %in% premiership_coaches, 1, 0))
+
+# Join to player_model data
+#####################################################
+# fetch_coaches_votes - rolling tally of how many coaches votes they are on 
+coaches_votes <- fetch_coaches_votes()
 #####################################################
 # Modelling
 train_data <- player_model_data %>% filter(Season < 2024)
