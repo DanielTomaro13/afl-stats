@@ -80,21 +80,40 @@ player_details_all <- map_dfr(seasons, ~{
   fetch_player_details(season = .x, source = "footywire")
 })
 
-position <- player_details_all %>% select(first_name, surname, Position_1, Position_2) %>% 
-  mutate(is_defender = NA, is_midfielder = NA, is_forward = NA)
+position <- player_details_all %>%
+  select(first_name, surname, Position_1, Position_2) %>%
+  mutate(
+    Player = paste(first_name, surname),
+    is_defender = as.integer(Position_1 == "Defender" | Position_2 == "Defender"),
+    is_midfielder = as.integer(Position_1 == "Midfield" | Position_2 == "Midfield"),
+    is_forward = as.integer(Position_1 == "Forward" | Position_2 == "Forward")
+  ) %>%
+  select(Player, is_defender, is_midfielder, is_forward) %>% 
+  mutate(
+    across(c(is_defender, is_midfielder, is_forward), ~replace_na(., 0))
+  )
+
+player_model_data <- player_model_data %>%
+  left_join(position, by = "Player") %>%
+  mutate(across(c(is_defender, is_midfielder, is_forward), ~replace_na(., 0)))
 #####################################################
 # Modelling
 train_data <- player_model_data %>% filter(Season < 2024)
 test_data  <- player_model_data %>% filter(Season == 2024)
 #####################################################
 # Linear Model
-model_disposals <- lm(Disposals ~ ., data = train_data %>% select(Disposals, starts_with("avg_"), starts_with("roll3_")))
-model_goals     <- lm(Goals ~ ., data = train_data %>% select(Goals, starts_with("avg_"), starts_with("roll3_")))
-model_marks     <- lm(Marks ~ ., data = train_data %>% select(Marks, starts_with("avg_"), starts_with("roll3_")))
-model_tackles   <- lm(Tackles ~ ., data = train_data %>% select(Tackles, starts_with("avg_"), starts_with("roll3_")))
-model_kicks     <- lm(Kicks ~ ., data = train_data %>% select(Kicks, starts_with("avg_"), starts_with("roll3_")))
-model_clear     <- lm(Clearances ~ ., data = train_data %>% select(Clearances, starts_with("avg_"), starts_with("roll3_")))
-
+model_disposals <- lm(Disposals ~ ., data = train_data %>%
+                        select(Disposals, starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward))
+model_goals <- lm(Goals ~ ., data = train_data %>%
+                    select(Goals, starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward))
+model_marks <- lm(Marks ~ ., data = train_data %>%
+                    select(Marks, starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward))
+model_tackles <- lm(Tackles ~ ., data = train_data %>%
+                      select(Tackles, starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward))
+model_kicks <- lm(Kicks ~ ., data = train_data %>%
+                    select(Kicks, starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward))
+model_clear <- lm(Clearances ~ ., data = train_data %>%
+                    select(Clearances, starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward))
 summary(model_disposals)
 summary(model_goals)
 summary(model_marks)
@@ -109,8 +128,13 @@ train_xgb_model <- function(target_var) {
   y_train <- train_data[[target_var]]
   y_test  <- test_data[[target_var]]
   
-  x_train <- train_data %>% select(starts_with("avg_"), starts_with("roll3_")) %>% as.matrix()
-  x_test  <- test_data %>% select(starts_with("avg_"), starts_with("roll3_")) %>% as.matrix()
+  x_train <- train_data %>%
+    select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward) %>%
+    as.matrix()
+  x_test <- test_data %>%
+    select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward) %>%
+    as.matrix()
+  
   
   dtrain <- xgb.DMatrix(data = x_train, label = y_train)
   dtest  <- xgb.DMatrix(data = x_test, label = y_test)
