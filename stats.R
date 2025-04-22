@@ -98,6 +98,14 @@ player_model_data <- player_model_data %>%
   mutate(across(c(is_defender, is_midfielder, is_forward), ~replace_na(., 0)))
 #####################################################
 # Add some sort o feature for incredibly bad teams e.g. is_bottom_four
+# is_debut season
+# is_over_100_games _200 _300 etc
+# is_brownlow_winner
+# is_bnf_winner
+# is_stat_beast - does this player average x+ in a certain stat
+# is_wet_weather
+# is_inside_mid , key_forward - there is a source for player details or results with this information
+# premiership_coach
 #####################################################
 # Modelling
 train_data <- player_model_data %>% filter(Season < 2024)
