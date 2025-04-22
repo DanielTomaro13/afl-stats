@@ -97,6 +97,8 @@ player_model_data <- player_model_data %>%
   left_join(position, by = "Player") %>%
   mutate(across(c(is_defender, is_midfielder, is_forward), ~replace_na(., 0)))
 #####################################################
+# Add some sort of feature for Team or Opposition performance e.g. higher predictions against worst teams
+#####################################################
 # Modelling
 train_data <- player_model_data %>% filter(Season < 2024)
 test_data  <- player_model_data %>% filter(Season == 2024)
@@ -176,10 +178,12 @@ for (stat in target_stats) {
 #####################################################
 # Predictions
 future_lagged <- player_model_data %>%
-  filter(Season == 2025, Round == 7)
+  filter(Season == 2025, Round == 7) %>%
+  distinct(ID, .keep_all = TRUE)
+
 
 future_matrix <- future_lagged %>%
-  select(starts_with("avg_"), starts_with("roll3_")) %>%
+  select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward) %>%
   as.matrix()
 
 for (stat in c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")) {
@@ -202,7 +206,7 @@ round_data <- player_model_data %>%
   filter(Season == 2025, Round == 6)
 
 round_matrix <- round_data %>%
-  select(starts_with("avg_"), starts_with("roll3_")) %>%
+  select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward) %>%
   as.matrix()
 
 for (stat in c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")) {
@@ -213,14 +217,14 @@ for (stat in c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances"))
 
 round_comparison <- round_data %>%
   select(
-    Team, Player,
+    Team, Player, ID,
     Disposals, Predicted_Disposals,
     Goals, Predicted_Goals,
     Marks, Predicted_Marks,
     Tackles, Predicted_Tackles,
     Kicks, Predicted_Kicks,
     Clearances, Predicted_Clearances
-  )
+  ) %>% distinct(ID, .keep_all = TRUE)
 
 target_stats <- c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")
 
@@ -235,6 +239,31 @@ for (stat in target_stats) {
   cat(sprintf("  MAE  = %.2f\n", mae_val))
   cat(sprintf("  RMSE = %.2f\n", rmse_val))
 }
+#####################################################
+# Converting Predictions into probailities and odds
+odds <- player_model_data %>% filter(Season == 2025, Round == 6)
+
+odds_matrix <- odds %>%
+  select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward) %>%
+  as.matrix()
+
+for (stat in c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")) {
+  model <- xgb_models[[stat]]
+  pred <- predict(model, newdata = odds_matrix)
+  odds[[paste0("Predicted_", stat)]] <- pred
+}
+
+odds <- odds %>%
+  select(
+    Team, Player, ID,
+    Predicted_Disposals,
+    Predicted_Goals,
+    Predicted_Marks,
+    Predicted_Tackles,
+    Predicted_Kicks,
+    Predicted_Clearances
+  ) %>%
+  distinct(ID, .keep_all = TRUE)
 #####################################################
 # Scraping Bookies
 library(rvest)
