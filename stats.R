@@ -97,7 +97,7 @@ player_model_data <- player_model_data %>%
   left_join(position, by = "Player") %>%
   mutate(across(c(is_defender, is_midfielder, is_forward), ~replace_na(., 0)))
 #####################################################
-# Add some sort of feature for Team or Opposition performance e.g. higher predictions against worst teams
+# Add some sort o feature for incredibly bad teams e.g. is_bottom_four
 #####################################################
 # Modelling
 train_data <- player_model_data %>% filter(Season < 2024)
