@@ -122,7 +122,18 @@ player_details_specific <- map_dfr(seasons, ~{
 })
 
 detailed_position <- player_details_specific %>%
-  select(firstName, surname, position)
+  select(firstName, surname, position) %>% 
+  mutate(
+    Player = paste(firstName, surname),
+    is_key_defender = as.integer(position == "KEY_DEFENDER"),
+    is_midfielder_forward = as.integer(position == "MIDFIELDER_FORWARD"),
+    is_key_forward = as.integer(position == "KEY_FORWARD")
+  ) %>%
+  select(Player, is_key_defender, is_midfielder_forward, is_key_forward)
+
+player_model_data <- player_model_data %>%
+  left_join(detailed_position, by = "Player") %>%
+  mutate(across(c(is_key_defender, is_midfielder_forward, is_key_forward)))
 #####################################################
 # premiership_coach
 premiership_coaches <- c(
@@ -152,7 +163,7 @@ team_coach <- coach %>% select(Season, Round, Date, Playing.for, Coach) %>%
 
 prem_coach <- team_coach %>%
   select(Date, Season, Round, Team, Coach) %>%
-  distinct() %>%  # So we don't duplicate teams
+  distinct() %>%  # So we don't duplicate teams - can maybe remove this
   mutate(is_premiership_coach = ifelse(Coach %in% premiership_coaches, 1, 0))
 
 # Join to player_model data
