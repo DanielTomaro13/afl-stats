@@ -99,18 +99,61 @@ player_model_data <- player_model_data %>%
 #####################################################
 # Add some sort o feature for incredibly bad teams e.g. is_bottom_four
 #####################################################
-# is_debut season - player details has draft year
+# is_debut season - player details has debutYear
+library(purrr)
+seasons <- 2003:2025
+debut_year <- map_dfr(seasons, ~{
+  fetch_player_details(season = .x, source = "AFL")
+})
+
+debut_year <- debut_year %>%
+  select(firstName, surname, debutYear) %>% 
+  select(Player, debutYear)
+
+# Join and assign 1 if debutYear = Season
 #####################################################
-# is_over_100_games _200 _300 etc
+# is_over_100_games _200 _300 
 #####################################################
 # is_brownlow_winner
+brownlow_winners <- c(
+'Patrick Cripps',
+'Lachie Neale',
+'Ollie Wines',
+'Nat Fyfe',
+'Tom Mitchell',
+'Dustin Martin',
+'Patrick Dangerfield',
+'Matt Pridis',
+'Gary Ablett',
+'Sam Mithcell',
+'Trent Cotchin',
+'Dane Swan',
+'Chris Judd',
+'Adam Cooney',
+'Jimmy Bartel',
+'Adam Goodes',
+'Ben Cousins',
+'Mark Ricciuto',
+'Nathan Buckley',
+'Simon Black',
+'Jason Akermanis',
+'Shane Woewodin',
+'Shane Crawford',
+'Robert Harvey',
+'Michael Voss',
+'James Hird'
+)
+
+
+player_model_data <- player_model_data %>% 
+  mutate(is_brownlow_winner = ifelse(Player %in% brownlow_winners, 1, 0))
 #####################################################
 # is_bnf_winner
 #####################################################
 # is_stat_beast - does this player average x+ in a certain stat
 #####################################################
-# is_wet_weather
-weather <- fetch_results_afl()
+# is_wet_weather - RAIN or WINDY in weatherType
+weather <- fetch_results_afl(2003:2025)
 weather <- weather %>% select(match.date, round.roundNumber, match.homeTeam.name, match.awayTeam.name,
                               weather.description, weather.tempInCelsius, weather.weatherType)
 #####################################################
