@@ -6,7 +6,7 @@ library(ggplot2)
 library(fitzRoy) 
 library(slider)
 #####################################################
-player_stats <- fetch_player_stats_afltables(2014:2025)
+player_stats <- fetch_player_stats_afltables(2022:2025) # earliest year is 2003
 colnames(player_stats)
 
 player_stats <- player_stats %>% select(
@@ -75,7 +75,7 @@ player_model_data <- player_model_data %>%
 #####################################################
 # Player Position
 library(purrr)
-seasons <- 2014:2025
+seasons <- 2022:2025
 player_details_all <- map_dfr(seasons, ~{
   fetch_player_details(season = .x, source = "footywire")
 })
@@ -101,7 +101,7 @@ player_model_data <- player_model_data %>%
 #####################################################
 # is_debut season - player details has debutYear
 library(purrr)
-seasons <- 2014:2025
+seasons <- 2022:2025
 debut_year <- map_dfr(seasons, ~{
   fetch_player_details(season = .x, source = "AFL")
 })
@@ -255,7 +255,7 @@ player_model_data <- player_model_data %>%
 #####################################################
 # is_key_forward or is_key_back or midfielder_forward 
 library(purrr)
-seasons <- 2014:2025
+seasons <- 2022:2025
 player_details_specific <- map_dfr(seasons, ~{
   fetch_player_details(season = .x, source = "AFL")
 })
@@ -296,7 +296,7 @@ premiership_coaches <- c(
   "Walls, Robert",
   "Williams, Mark"
 )
-coach <- fetch_player_stats_afltables(2003:2025)
+coach <- fetch_player_stats_afltables(2020:2025)
 team_coach <- coach %>% select(Season, Round, Date, Playing.for, Coach) %>% 
   rename(Team = Playing.for)
 
@@ -342,6 +342,8 @@ player_model_data <- player_model_data %>%
 # Modelling
 train_data <- player_model_data %>% filter(Season < 2024)
 test_data  <- player_model_data %>% filter(Season == 2024)
+
+rm(list = setdiff(ls(), c("train_data", "test_data", "player_model_data")))
 #####################################################
 # Linear Model
 # Disposals Model
@@ -355,8 +357,8 @@ model_disposals <- lm(Disposals ~ ., data = train_data %>%
                           is_over_100_games, is_over_200_games, is_over_300_games,
                           is_brownlow_winner,
                           is_key_defender, is_key_forward, is_midfielder_forward,
-                          is_premiership_coach
-                         # is_debut_season
+                          is_premiership_coach,
+                          is_debut_season
                         ))
 
 # Goals Model
@@ -478,7 +480,9 @@ train_xgb_model <- function(target_var) {
 }
 
 # Target stats to model
-target_stats <- c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")
+target_stats <- c("Disposals"
+                  #, "Goals", "Marks", "Tackles", "Kicks", "Clearances"
+                  )
 
 # Store models and predictions
 xgb_models <- list()
@@ -508,11 +512,15 @@ future_lagged <- player_model_data %>%
 
 future_matrix <- future_lagged %>%
   select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward, is_home_game, played_last_game, is_over_100_games, 
-         is_over_200_games, is_over_300_games, is_debut_season, is_brownlow_winner, is_key_defender, is_key_forward, is_midfielder_forward,
-         is_premiership_coach) %>%
+         is_over_200_games, is_over_300_games, is_brownlow_winner, is_key_defender, is_key_forward, is_midfielder_forward,
+         is_premiership_coach
+         #is_debut_season, 
+         ) %>%
   as.matrix()
 
-for (stat in c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")) {
+for (stat in c("Disposals"
+               #, "Goals", "Marks", "Tackles", "Kicks", "Clearances"
+               )) {
   model <- xgb_models[[stat]]
   pred <- predict(model, newdata = future_matrix)
   future_lagged[[paste0("Predicted_", stat)]] <- pred
@@ -533,11 +541,15 @@ round_data <- player_model_data %>%
 
 round_matrix <- round_data %>%
   select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward, is_home_game, played_last_game, is_over_100_games, 
-         is_over_200_games, is_over_300_games, is_debut_season, is_brownlow_winner, is_key_defender, is_key_forward, is_midfielder_forward,
-         is_premiership_coach) %>%
+         is_over_200_games, is_over_300_games, is_brownlow_winner, is_key_defender, is_key_forward, is_midfielder_forward,
+         is_premiership_coach
+         # is_debut_season, 
+         ) %>%
   as.matrix()
 
-for (stat in c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")) {
+for (stat in c("Disposals"
+               #, "Goals", "Marks", "Tackles", "Kicks", "Clearances"
+               )) {
   model <- xgb_models[[stat]]
   pred <- predict(model, newdata = round_matrix)
   round_data[[paste0("Predicted_", stat)]] <- round(pred, 0)
@@ -546,15 +558,19 @@ for (stat in c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances"))
 round_comparison <- round_data %>%
   select(
     Team, Player, ID,
-    Disposals, Predicted_Disposals,
-    Goals, Predicted_Goals,
-    Marks, Predicted_Marks,
-    Tackles, Predicted_Tackles,
-    Kicks, Predicted_Kicks,
-    Clearances, Predicted_Clearances
+    Disposals,
+    Predicted_Disposals
+    #,
+    # Goals, Predicted_Goals,
+    # Marks, Predicted_Marks,
+    # Tackles, Predicted_Tackles,
+    # Kicks, Predicted_Kicks,
+    # Clearances, Predicted_Clearances
   ) %>% distinct(ID, .keep_all = TRUE)
 
-target_stats <- c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")
+target_stats <- c("Disposals"
+                  #, "Goals", "Marks", "Tackles", "Kicks", "Clearances"
+                  )
 
 for (stat in target_stats) {
   actual <- round_data[[stat]]
@@ -569,15 +585,19 @@ for (stat in target_stats) {
 }
 #####################################################
 # Converting Predictions into probailities and odds
-odds <- player_model_data %>% filter(Season == 2025, Round == 6)
+odds <- player_model_data %>% filter(Season == 2025, Round == 7)
 
 odds_matrix <- odds %>%
   select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward, is_home_game, played_last_game, is_over_100_games, 
-         is_over_200_games, is_over_300_games, is_debut_season, is_brownlow_winner, is_key_defender, is_key_forward, is_midfielder_forward,
-         is_premiership_coach) %>%
+         is_over_200_games, is_over_300_games, is_brownlow_winner, is_key_defender, is_key_forward, is_midfielder_forward,
+         is_premiership_coach
+         #is_debut_season, 
+         ) %>%
   as.matrix()
 
-for (stat in c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances")) {
+for (stat in c("Disposals"
+               #, "Goals", "Marks", "Tackles", "Kicks", "Clearances"
+               )) {
   model <- xgb_models[[stat]]
   pred <- predict(model, newdata = odds_matrix)
   odds[[paste0("Predicted_", stat)]] <- pred
@@ -586,44 +606,47 @@ for (stat in c("Disposals", "Goals", "Marks", "Tackles", "Kicks", "Clearances"))
 odds <- odds %>%
   select(
     Team, Player, ID,
-    Predicted_Disposals,
-    Predicted_Goals,
-    Predicted_Marks,
-    Predicted_Tackles,
-    Predicted_Kicks,
-    Predicted_Clearances
+    Predicted_Disposals
+    #,
+    # Predicted_Goals,
+    # Predicted_Marks,
+    # Predicted_Tackles,
+    # Predicted_Kicks,
+    # Predicted_Clearances
   ) %>%
   distinct(ID, .keep_all = TRUE)
 #####################################################
 # # # Use your actual value from model summary
-# resid_sds <- list(
-#   Disposals = 4.5,
+resid_sds <- list(
+Disposals = 5.148
 #   Goals = 0.7,
 #   Marks = 2.5,
 #   Tackles = 2.2,
 #   Kicks = 3.5,
 #   Clearances = 1.8
-# )
+ )
 # 
-# thresholds <- list(
-#   Disposals = c(15, 20, 25, 30),
+thresholds <- list(
+Disposals = c(15, 20, 25, 30)
 #   Goals = c(1, 2, 3),
 #   Marks = c(4, 6, 8),
 #   Tackles = c(4, 6, 8),
 #   Kicks = c(10, 15, 20),
 #   Clearances = c(4, 6, 8)
-# )
+ )
 
-# for (stat in names(thresholds)) {
-#   for (thresh in thresholds[[stat]]) {
-#     prob_col <- paste0("Prob_", thresh, "_", stat)
-#     odds_col <- paste0("Odds_", thresh, "_", stat)
-#     pred_col <- paste0("Predicted_", stat)
-#     
-#     odds[[prob_col]] <- 1 - pnorm(thresh, mean = odds[[pred_col]], sd = resid_sds[[stat]])
-#     odds[[odds_col]] <- round(1 / odds[[prob_col]], 2)
-#   }
-# }
+for (stat in names(thresholds)) {
+  for (thresh in thresholds[[stat]]) {
+    prob_col <- paste0("Prob_", thresh, "_", stat)
+    odds_col <- paste0("Odds_", thresh, "_", stat)
+    pred_col <- paste0("Predicted_", stat)
+
+    odds[[prob_col]] <- 1 - pnorm(thresh, mean = odds[[pred_col]], sd = resid_sds[[stat]])
+    odds[[odds_col]] <- round(1 / odds[[prob_col]], 2)
+  }
+}
+
+odds <- odds %>% filter(Team == 'Collingwood') %>% select(Odds_20_Disposals, Player)
 #####################################################
 # Scraping Bookies
 library(rvest)
