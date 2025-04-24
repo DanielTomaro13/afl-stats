@@ -9,3 +9,29 @@ Goals | Poisson or Negative Binomial | Often 0-3 goals, low mean, classic count 
 Marks | Poisson or Negative Binomial | Integer count, similar to goals
 Tackles | Poisson or Negative Binomial | Discrete, skewed
 Kicks, Clearances | XGBoost or Poisson | Discrete but can be high values — hybrid zone
+
+fixes for prices
+current : 
+odds[[prob_col]] <- 1 - pnorm(thresh, mean = odds[[pred_col]], sd = resid_sds[[stat]])
+odds[[odds_col]] <- round(1 / odds[[prob_col]], 2)
+
+fix 1:
+odds[[prob_col]] <- 1 - ppois(thresh - 1, lambda = odds[[pred_col]])
+odds[[odds_col]] <- round(1 / odds[[prob_col]], 2)
+
+
+fix 2:
+sim_preds <- replicate(10000, odds[[pred_col]] + rnorm(nrow(odds), 0, resid_sds[[stat]]))
+odds[[prob_col]] <- rowMeans(sim_preds >= thresh)
+
+
+fix 3:
+library(MASS)
+nb_model <- glm.nb(Disposals ~ ..., data = train_data)
+# Then use:
+1 - pnbinom(thresh - 1, mu = pred, size = nb_model$theta)
+
+
+Monte carlo might be the way
+
+Clean the script up so it saves all necessary data files
