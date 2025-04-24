@@ -1,3 +1,11 @@
 Ideas
 
 Just do a script for a single stat, that way can focus more on that stat
+
+try different models
+Stat | Model Suggestion | Reason
+Disposals | XGBoost or Negative Binomial | High variance, count but semi-continuous in behavior
+Goals | Poisson or Negative Binomial | Often 0-3 goals, low mean, classic count data
+Marks | Poisson or Negative Binomial | Integer count, similar to goals
+Tackles | Poisson or Negative Binomial | Discrete, skewed
+Kicks, Clearances | XGBoost or Poisson | Discrete but can be high values — hybrid zone
