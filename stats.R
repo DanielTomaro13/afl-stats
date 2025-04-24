@@ -6,7 +6,11 @@ library(ggplot2)
 library(fitzRoy) 
 library(slider)
 #####################################################
-player_stats <- fetch_player_stats_afltables(2003:2025) # earliest year is 2003
+# player_stats <- fetch_player_stats_afltables(2003:2025) # earliest year is 2003
+# Read the Above in
+# saveRDS(player_stats, file = "player_stats_2003_2025.rds")
+player_stats <- readRDS("player_stats_2003_2025.rds")
+
 colnames(player_stats)
 
 player_stats <- player_stats %>% select(
@@ -74,11 +78,13 @@ player_model_data <- player_model_data %>%
   inner_join(player_rolling_3, by = c("Date", "Season", "Round", "Team", "Player", "ID"))
 #####################################################
 # Player Position
-library(purrr)
-seasons <- 2022:2025
-player_details_all <- map_dfr(seasons, ~{
-  fetch_player_details(season = .x, source = "footywire")
-})
+# library(purrr)
+# seasons <- 2022:2025
+# player_details_all <- map_dfr(seasons, ~{
+#   fetch_player_details(season = .x, source = "footywire")
+# })
+# saveRDS(player_details_all, file = "player_details_all.rds")
+player_details_all <- readRDS("player_details_all.rds")
 
 position <- player_details_all %>%
   select(first_name, surname, Position_1, Position_2) %>%
@@ -100,11 +106,13 @@ player_model_data <- player_model_data %>%
 # Add some sort o feature for incredibly bad teams e.g. is_bottom_four
 #####################################################
 # is_debut season - player details has debutYear
-library(purrr)
-seasons <- 2003:2025
-debut_year <- map_dfr(seasons, ~{
-  fetch_player_details(season = .x, source = "AFL")
-})
+# library(purrr)
+# seasons <- 2003:2025
+# debut_year <- map_dfr(seasons, ~{
+#   fetch_player_details(season = .x, source = "AFL")
+# })
+# saveRDS(debut_year, file = "debut_year_2003_2025.rds")
+debut_year <- readRDS("debut_year_2003_2025.rds")
 
 debut_year <- debut_year %>%
   mutate(Player = paste(firstName, surname)) %>%
@@ -126,8 +134,11 @@ player_model_data <- player_model_data %>%
   )
 #####################################################
 # is_home_game
-results <- fetch_results_afltables(2003:2025)
-colnames(results)
+# results <- fetch_results_afltables(2003:2025)
+# colnames(results)
+# saveRDS(results, file = "results_afltables_2003_2025.rds")
+results <- readRDS("results_afltables_2003_2025.rds")
+
 
 home_away_flags <- results %>%
   select(Date, Season, Round = Round.Number, Home.Team, Away.Team) %>%
@@ -229,6 +240,9 @@ player_model_data <- player_model_data %>%
 #####################################################
 # is_wet_weather - RAIN or WINDY in weatherType
 # weather <- fetch_results_afl(2003:2025)
+# Read the above in
+# saveRDS(weather, file = "weather_afl_2003_2025.rds")
+# weather <- readRDS("weather_afl_2003_2025.rds")
 # weather <- weather %>% select(match.date, round.roundNumber, match.homeTeam.name, match.awayTeam.name,
 #                               weather.description, weather.tempInCelsius, weather.weatherType)
 # 
@@ -253,12 +267,14 @@ player_model_data <- player_model_data %>%
 #   left_join(weather_flags_long, by = c("Date", "Team")) %>%
 #   mutate(is_wet_weather = replace_na(is_wet_weather, 0))
 #####################################################
-# is_key_forward or is_key_back or midfielder_forward 
-library(purrr)
-seasons <- 2003:2025
-player_details_specific <- map_dfr(seasons, ~{
-  fetch_player_details(season = .x, source = "AFL")
-})
+# is_key_forward or is_key_back or midfielder_forward - this is not adding properly - memory limit
+# library(purrr)
+# seasons <- 2003:2025
+# player_details_specific <- map_dfr(seasons, ~{
+#   fetch_player_details(season = .x, source = "AFL")
+# })
+# saveRDS(player_details_specific, "player_details_afl_2003_2025.rds")
+player_details_specific <- readRDS("player_details_afl_2003_2025.rds")
 
 detailed_position <- player_details_specific %>%
   select(firstName, surname, position) %>% 
@@ -275,7 +291,7 @@ rm(player_stats, player_lagged, player_rolling_3,
 gc()
 
 player_model_data <- player_model_data %>%
-  left_join(detailed_position, by = "Player") %>%
+  left_join(detailed_position, by = "Player", relationship = 'many-to-many') %>%
   mutate(across(c(is_key_defender, is_midfielder_forward, is_key_forward)))
 #####################################################
 # premiership_coach
@@ -300,7 +316,12 @@ premiership_coaches <- c(
   "Walls, Robert",
   "Williams, Mark"
 )
-coach <- fetch_player_stats_afltables(2003:2025)
+# coach <- fetch_player_stats_afltables(2003:2025)
+# # Read the above in
+# saveRDS(coach, file = "player_stats_as_coach_data_2003_2025.rds")
+coach <- readRDS("player_stats_as_coach_data_2003_2025.rds")
+
+
 team_coach <- coach %>% select(Season, Round, Date, Playing.for, Coach) %>% 
   rename(Team = Playing.for)
 
@@ -322,6 +343,9 @@ player_model_data <- player_model_data %>%
 #####################################################
 # fetch_coaches_votes - extremely long load times
 # coaches_votes <- fetch_coaches_votes(2003:2025)
+# Read the above in
+# saveRDS(coaches_votes, "coaches_votes_2003_2025.rds")
+# coaches_votes <- readRDS("coaches_votes_2003_2025.rds")
 # colnames(coaches_votes)
 # 
 # votes_roll3 <- coaches_votes %>%
@@ -409,7 +433,12 @@ player_model_data <- readRDS("player_model_data.rds")
 
 # Modelling
 train_data <- player_model_data %>% filter(Season < 2024)
+saveRDS(train_data, "train_data.rds")
+train_data <- readRDS("train_data.rds")
 test_data  <- player_model_data %>% filter(Season == 2024)
+saveRDS(test_data, "test_data.rds")
+test_data <- readRDS("test_data.rds")
+
 
 rm(player_stats, player_lagged, player_rolling_3, detailed_position,
    debut_year, position, results, player_appearances, prem_coach, coach, has_na, home_away_flags, player_details_all,
