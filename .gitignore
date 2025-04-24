@@ -4,3 +4,4 @@
 .Ruserdata
 player_model_data.rds
 .RDataTmp
+*.rds
