@@ -6,7 +6,7 @@ library(ggplot2)
 library(fitzRoy) 
 library(slider)
 #####################################################
-player_stats <- fetch_player_stats_afltables(2022:2025) # earliest year is 2003
+player_stats <- fetch_player_stats_afltables(2003:2025) # earliest year is 2003
 colnames(player_stats)
 
 player_stats <- player_stats %>% select(
@@ -101,7 +101,7 @@ player_model_data <- player_model_data %>%
 #####################################################
 # is_debut season - player details has debutYear
 library(purrr)
-seasons <- 2022:2025
+seasons <- 2003:2025
 debut_year <- map_dfr(seasons, ~{
   fetch_player_details(season = .x, source = "AFL")
 })
@@ -126,7 +126,7 @@ player_model_data <- player_model_data %>%
   )
 #####################################################
 # is_home_game
-results <- fetch_results_afltables(2014:2025)
+results <- fetch_results_afltables(2003:2025)
 colnames(results)
 
 home_away_flags <- results %>%
@@ -213,7 +213,7 @@ brownlow_winners <- c(
 player_model_data <- player_model_data %>% 
   mutate(is_brownlow_winner = ifelse(Player %in% brownlow_winners, 1, 0))
 #####################################################
-# is_bnf_winner
+# is_bnf_winner - where can I find this information?
 #####################################################
 # is_stat_beast - does this player average x+ in a certain stat
 # player_model_data <- player_model_data %>%
@@ -255,7 +255,7 @@ player_model_data <- player_model_data %>%
 #####################################################
 # is_key_forward or is_key_back or midfielder_forward 
 library(purrr)
-seasons <- 2022:2025
+seasons <- 2003:2025
 player_details_specific <- map_dfr(seasons, ~{
   fetch_player_details(season = .x, source = "AFL")
 })
@@ -269,6 +269,10 @@ detailed_position <- player_details_specific %>%
     is_key_forward = as.integer(position == "KEY_FORWARD")
   ) %>%
   select(Player, is_key_defender, is_midfielder_forward, is_key_forward)
+
+rm(player_stats, player_lagged, player_rolling_3,
+   debut_year, position, results, player_appearances, prem_coach, player_details_specific, train_data, test_data)
+gc()
 
 player_model_data <- player_model_data %>%
   left_join(detailed_position, by = "Player") %>%
@@ -296,7 +300,7 @@ premiership_coaches <- c(
   "Walls, Robert",
   "Williams, Mark"
 )
-coach <- fetch_player_stats_afltables(2020:2025)
+coach <- fetch_player_stats_afltables(2003:2025)
 team_coach <- coach %>% select(Season, Round, Date, Playing.for, Coach) %>% 
   rename(Team = Playing.for)
 
@@ -339,11 +343,78 @@ player_model_data <- player_model_data %>%
 #   left_join(votes_cumavg, by = c("Date", "Player")) %>%
 #   mutate(across(c(roll3_coach_votes, avg_coach_votes), ~replace_na(., 0)))
 #####################################################
+# Team Stats
+# team_avg_stats <- player_stats %>%
+#   arrange(Team, Date) %>%
+#   group_by(Team) %>%
+#   mutate(
+#     avg_Kicks_Team = lag(cummean(Kicks)),
+#     avg_Marks_Team = lag(cummean(Marks)),
+#     avg_Handballs_Team = lag(cummean(Handballs)),
+#     avg_Disposals_Team = lag(cummean(Disposals)),
+#     avg_Goals_Team = lag(cummean(Goals)),
+#     avg_Behinds_Team = lag(cummean(Behinds)),
+#     avg_Tackles_Team = lag(cummean(Tackles)),
+#     avg_Rebounds_Team = lag(cummean(Rebounds)),
+#     avg_Inside.50s_Team = lag(cummean(Inside.50s)),
+#     avg_Clearances_Team = lag(cummean(Clearances)),
+#     avg_Clangers_Team = lag(cummean(Clangers)),
+#     avg_Brownlow.Votes_Team = lag(cummean(Brownlow.Votes)),
+#     avg_Contested.Possessions_Team = lag(cummean(Contested.Possessions)),
+#     avg_Uncontested.Possessions_Team = lag(cummean(Uncontested.Possessions)),
+#     avg_Contested.Marks_Team = lag(cummean(Contested.Marks)),
+#     avg_Marks.Inside.50_Team = lag(cummean(Marks.Inside.50)),
+#     avg_One.Percenters_Team = lag(cummean(One.Percenters)),
+#     avg_Goal.Assists_Team = lag(cummean(Goal.Assists)),
+#     avg_Time.on.Ground_Team = lag(cummean(Time.on.Ground)),
+#     avg_Age_Team = lag(cummean(Age)),
+#     avg_Career_Games_Team = lag(cummean(Career.Games)),
+#     
+#     roll3_Kicks_Team = lag(slide_dbl(Kicks, mean, .before = 2, .complete = TRUE)),
+#     roll3_Marks_Team = lag(slide_dbl(Marks, mean, .before = 2, .complete = TRUE)),
+#     roll3_Handballs_Team = lag(slide_dbl(Handballs, mean, .before = 2, .complete = TRUE)),
+#     roll3_Disposals_Team = lag(slide_dbl(Disposals, mean, .before = 2, .complete = TRUE)),
+#     roll3_Goals_Team = lag(slide_dbl(Goals, mean, .before = 2, .complete = TRUE)),
+#     roll3_Behinds_Team = lag(slide_dbl(Behinds, mean, .before = 2, .complete = TRUE)),
+#     roll3_Tackles_Team = lag(slide_dbl(Tackles, mean, .before = 2, .complete = TRUE)),
+#     roll3_Rebounds_Team = lag(slide_dbl(Rebounds, mean, .before = 2, .complete = TRUE)),
+#     roll3_Inside.50s_Team = lag(slide_dbl(Inside.50s, mean, .before = 2, .complete = TRUE)),
+#     roll3_Clearances_Team = lag(slide_dbl(Clearances, mean, .before = 2, .complete = TRUE)),
+#     roll3_Clangers_Team = lag(slide_dbl(Clangers, mean, .before = 2, .complete = TRUE)),
+#     roll3_Brownlow.Votes_Team = lag(slide_dbl(Brownlow.Votes, mean, .before = 2, .complete = TRUE)),
+#     roll3_Contested.Possessions_Team = lag(slide_dbl(Contested.Possessions, mean, .before = 2, .complete = TRUE)),
+#     roll3_Uncontested.Possessions_Team = lag(slide_dbl(Uncontested.Possessions, mean, .before = 2, .complete = TRUE)),
+#     roll3_Contested.Marks_Team = lag(slide_dbl(Contested.Marks, mean, .before = 2, .complete = TRUE)),
+#     roll3_Marks.Inside.50_Team = lag(slide_dbl(Marks.Inside.50, mean, .before = 2, .complete = TRUE)),
+#     roll3_One.Percenters_Team = lag(slide_dbl(One.Percenters, mean, .before = 2, .complete = TRUE)),
+#     roll3_Goal.Assists_Team = lag(slide_dbl(Goal.Assists, mean, .before = 2, .complete = TRUE)),
+#     roll3_Time.on.Ground_Team = lag(slide_dbl(Time.on.Ground, mean, .before = 2, .complete = TRUE)),
+#     roll3_Age_Team = lag(slide_dbl(Age, mean, .before = 2, .complete = TRUE)),
+#     roll3_Career_Games_Team = lag(slide_dbl(Career.Games, mean, .before = 2, .complete = TRUE))
+#   ) %>%
+#   group_by(Date, Season, Round, Team) %>%
+#   summarise(across(starts_with("avg_"), mean, na.rm = TRUE),
+#             across(starts_with("roll3_"), mean, na.rm = TRUE),
+#             .groups = "drop")
+
+# Check Structure of Round in Both Datasets
+# str(team_avg_stats)
+# str(player_model_data)
+# player_model_data <- team_avg_stats %>%
+#   left_join(team_avg_stats, by = c("Date", "Season", "Round", "Team"))
+
+#####################################################
+saveRDS(player_model_data, "player_model_data.rds")
+player_model_data <- readRDS("player_model_data.rds")
+
 # Modelling
 train_data <- player_model_data %>% filter(Season < 2024)
 test_data  <- player_model_data %>% filter(Season == 2024)
 
-rm(list = setdiff(ls(), c("train_data", "test_data", "player_model_data")))
+rm(player_stats, player_lagged, player_rolling_3, detailed_position,
+   debut_year, position, results, player_appearances, prem_coach, coach, has_na, home_away_flags, player_details_all,
+   player_details_specific, team_coach, team_games)
+gc()
 #####################################################
 # Linear Model
 # Disposals Model
@@ -356,7 +427,7 @@ model_disposals <- lm(Disposals ~ ., data = train_data %>%
                           is_home_game, played_last_game,
                           is_over_100_games, is_over_200_games, is_over_300_games,
                           is_brownlow_winner,
-                          is_key_defender, is_key_forward, is_midfielder_forward,
+                          #is_key_defender, is_key_forward, is_midfielder_forward,
                           is_premiership_coach,
                           is_debut_season
                         ))
@@ -371,9 +442,9 @@ model_goals <- lm(Goals ~ ., data = train_data %>%
                       is_home_game, played_last_game,
                       is_over_100_games, is_over_200_games, is_over_300_games,
                       is_brownlow_winner,
-                      is_key_defender, is_key_forward, is_midfielder_forward,
-                      is_premiership_coach
-                     # is_debut_season
+                      #is_key_defender, is_key_forward, is_midfielder_forward,
+                      is_premiership_coach,
+                      is_debut_season
                     ))
 
 # Marks Model
@@ -386,24 +457,24 @@ model_marks <- lm(Marks ~ ., data = train_data %>%
                       is_home_game, played_last_game,
                       is_over_100_games, is_over_200_games, is_over_300_games,
                       is_brownlow_winner,
-                      is_key_defender, is_key_forward, is_midfielder_forward,
-                      is_premiership_coach
-                      # is_debut_season
+                      #is_key_defender, is_key_forward, is_midfielder_forward,
+                      is_premiership_coach,
+                      is_debut_season
                     ))
 
 # Tackles Model
 model_tackles <- lm(Tackles ~ ., data = train_data %>%
                     select(
-                      Marks,
+                      Tackles,
                       starts_with("avg_"),
                       starts_with("roll3_"),
                       is_defender, is_midfielder, is_forward,
                       is_home_game, played_last_game,
                       is_over_100_games, is_over_200_games, is_over_300_games,
                       is_brownlow_winner,
-                      is_key_defender, is_key_forward, is_midfielder_forward,
-                      is_premiership_coach
-                      # is_debut_season
+                      #is_key_defender, is_key_forward, is_midfielder_forward,
+                      is_premiership_coach,
+                      is_debut_season
                     ))
 
 # Kicks Model
@@ -416,8 +487,9 @@ model_kicks <- lm(Kicks ~ ., data = train_data %>%
                       is_home_game, played_last_game,
                       is_over_100_games, is_over_200_games, is_over_300_games,
                       is_debut_season, is_brownlow_winner,
-                      is_key_defender, is_key_forward, is_midfielder_forward,
-                      is_premiership_coach
+                      #is_key_defender, is_key_forward, is_midfielder_forward,
+                      is_premiership_coach,
+                      is_debut_season
                     ))
 
 # Clearances Model
@@ -430,8 +502,9 @@ model_clear <- lm(Clearances ~ ., data = train_data %>%
                       is_home_game, played_last_game,
                       is_over_100_games, is_over_200_games, is_over_300_games,
                       is_debut_season, is_brownlow_winner,
-                      is_key_defender, is_key_forward, is_midfielder_forward,
-                      is_premiership_coach
+                      #is_key_defender, is_key_forward, is_midfielder_forward,
+                      is_premiership_coach,
+                      is_debut_season
                     ))
 
 summary(model_disposals)
@@ -450,16 +523,18 @@ train_xgb_model <- function(target_var) {
   
   x_train <- train_data %>%
     select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward, is_home_game, played_last_game, is_over_100_games, 
-           is_over_200_games, is_over_300_games, is_brownlow_winner, is_key_defender, is_key_forward, is_midfielder_forward,
-           is_premiership_coach
-           #is_debut_season, 
+           is_over_200_games, is_over_300_games, is_brownlow_winner,
+           #is_key_defender, is_key_forward, is_midfielder_forward,
+           is_premiership_coach,
+           is_debut_season
            ) %>%
     as.matrix()
   x_test <- test_data %>%
     select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward, is_home_game, played_last_game, is_over_100_games, 
-           is_over_200_games, is_over_300_games, is_brownlow_winner, is_key_defender, is_key_forward, is_midfielder_forward,
-           is_premiership_coach
-           #is_debut_season,
+           is_over_200_games, is_over_300_games, is_brownlow_winner, 
+           #is_key_defender, is_key_forward, is_midfielder_forward,
+           is_premiership_coach,
+           is_debut_season
            ) %>%
     as.matrix()
   
@@ -481,7 +556,8 @@ train_xgb_model <- function(target_var) {
 
 # Target stats to model
 target_stats <- c("Disposals"
-                  #, "Goals", "Marks", "Tackles", "Kicks", "Clearances"
+                  , "Goals", "Marks", "Tackles"
+                  #, "Kicks", "Clearances"
                   )
 
 # Store models and predictions
@@ -512,14 +588,16 @@ future_lagged <- player_model_data %>%
 
 future_matrix <- future_lagged %>%
   select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward, is_home_game, played_last_game, is_over_100_games, 
-         is_over_200_games, is_over_300_games, is_brownlow_winner, is_key_defender, is_key_forward, is_midfielder_forward,
-         is_premiership_coach
-         #is_debut_season, 
+         is_over_200_games, is_over_300_games, is_brownlow_winner, 
+         #is_key_defender, is_key_forward, is_midfielder_forward,
+         is_premiership_coach,
+         is_debut_season
          ) %>%
   as.matrix()
 
 for (stat in c("Disposals"
-               #, "Goals", "Marks", "Tackles", "Kicks", "Clearances"
+               , "Goals", "Marks", "Tackles"
+               #, "Kicks", "Clearances"
                )) {
   model <- xgb_models[[stat]]
   pred <- predict(model, newdata = future_matrix)
@@ -527,7 +605,7 @@ for (stat in c("Disposals"
 }
 
 future_lagged_team <- future_lagged %>%
-  filter(Team %in% c("Collingwood", "Essendon")) %>%
+  filter(Team %in% c("Richmond", "Melbourne")) %>%
   select(
     Team, Player,
     starts_with("Predicted_")
@@ -541,14 +619,16 @@ round_data <- player_model_data %>%
 
 round_matrix <- round_data %>%
   select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward, is_home_game, played_last_game, is_over_100_games, 
-         is_over_200_games, is_over_300_games, is_brownlow_winner, is_key_defender, is_key_forward, is_midfielder_forward,
-         is_premiership_coach
-         # is_debut_season, 
+         is_over_200_games, is_over_300_games, is_brownlow_winner, 
+         #is_key_defender, is_key_forward, is_midfielder_forward,
+         is_premiership_coach,
+         is_debut_season
          ) %>%
   as.matrix()
 
 for (stat in c("Disposals"
-               #, "Goals", "Marks", "Tackles", "Kicks", "Clearances"
+               , "Goals", "Marks", "Tackles"
+               #, "Kicks", "Clearances"
                )) {
   model <- xgb_models[[stat]]
   pred <- predict(model, newdata = round_matrix)
@@ -559,17 +639,18 @@ round_comparison <- round_data %>%
   select(
     Team, Player, ID,
     Disposals,
-    Predicted_Disposals
+    Predicted_Disposals,
+    Goals, Predicted_Goals,
+    Marks, Predicted_Marks,
+    Tackles, Predicted_Tackles
     #,
-    # Goals, Predicted_Goals,
-    # Marks, Predicted_Marks,
-    # Tackles, Predicted_Tackles,
     # Kicks, Predicted_Kicks,
     # Clearances, Predicted_Clearances
   ) %>% distinct(ID, .keep_all = TRUE)
 
 target_stats <- c("Disposals"
-                  #, "Goals", "Marks", "Tackles", "Kicks", "Clearances"
+                  , "Goals", "Marks", "Tackles"
+                  #, "Kicks", "Clearances"
                   )
 
 for (stat in target_stats) {
@@ -589,14 +670,16 @@ odds <- player_model_data %>% filter(Season == 2025, Round == 7)
 
 odds_matrix <- odds %>%
   select(starts_with("avg_"), starts_with("roll3_"), is_defender, is_midfielder, is_forward, is_home_game, played_last_game, is_over_100_games, 
-         is_over_200_games, is_over_300_games, is_brownlow_winner, is_key_defender, is_key_forward, is_midfielder_forward,
-         is_premiership_coach
-         #is_debut_season, 
+         is_over_200_games, is_over_300_games, is_brownlow_winner, 
+         #is_key_defender, is_key_forward, is_midfielder_forward,
+         is_premiership_coach,
+         is_debut_season
          ) %>%
   as.matrix()
 
 for (stat in c("Disposals"
-               #, "Goals", "Marks", "Tackles", "Kicks", "Clearances"
+               , "Goals", "Marks", "Tackles"
+               #, "Kicks", "Clearances"
                )) {
   model <- xgb_models[[stat]]
   pred <- predict(model, newdata = odds_matrix)
@@ -606,11 +689,11 @@ for (stat in c("Disposals"
 odds <- odds %>%
   select(
     Team, Player, ID,
-    Predicted_Disposals
+    Predicted_Disposals,
+    Predicted_Goals,
+    Predicted_Marks,
+    Predicted_Tackles
     #,
-    # Predicted_Goals,
-    # Predicted_Marks,
-    # Predicted_Tackles,
     # Predicted_Kicks,
     # Predicted_Clearances
   ) %>%
@@ -618,21 +701,23 @@ odds <- odds %>%
 #####################################################
 # # # Use your actual value from model summary
 resid_sds <- list(
-Disposals = 5.148
-#   Goals = 0.7,
-#   Marks = 2.5,
-#   Tackles = 2.2,
-#   Kicks = 3.5,
-#   Clearances = 1.8
- )
-# 
+  Disposals = sd(residuals(model_disposals)),
+  Goals = sd(residuals(model_goals)),
+  Marks = sd(residuals(model_marks)),
+  Tackles = sd(residuals(model_tackles))
+  #,
+  # Kicks = sd(residuals(model_kicks)),
+  # Clearances = sd(residuals(model_clear))
+)
+
 thresholds <- list(
-Disposals = c(15, 20, 25, 30)
-#   Goals = c(1, 2, 3),
-#   Marks = c(4, 6, 8),
-#   Tackles = c(4, 6, 8),
-#   Kicks = c(10, 15, 20),
-#   Clearances = c(4, 6, 8)
+Disposals = c(15, 20, 25, 30),
+   Goals = c(1, 2, 3),
+   Marks = c(4, 6, 8),
+   Tackles = c(4, 6, 8)
+#,
+   # Kicks = c(10, 15, 20),
+   # Clearances = c(4, 6, 8)
  )
 
 for (stat in names(thresholds)) {
@@ -646,7 +731,9 @@ for (stat in names(thresholds)) {
   }
 }
 
-odds <- odds %>% filter(Team == 'Collingwood') %>% select(Odds_20_Disposals, Player)
+odds <- odds %>% filter(Team == 'Richmond' | Team == 'Melbourne') %>% select(Odds_20_Disposals, Odds_30_Disposals, Odds_1_Goals, Odds_3_Goals,
+                                                       Odds_6_Marks, Odds_8_Marks, Odds_6_Tackles, Odds_8_Tackles, Player)
+
 #####################################################
 # Scraping Bookies
 library(rvest)
